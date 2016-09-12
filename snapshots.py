@@ -45,11 +45,15 @@ def make_snapshots(event, context):
             Tags=[{'Key': 'Name', 'Value': name}])
 
 def delete_old_snapshots(event, context):
-    """Delete old snapshots older than DAYS_TO_KEEP days
+    """Delete old snapshots older than the specified number of days
 
-    It may be worthwhile to have the days parameter optionally come from
-    a JSON Constant, declared in the "inputs" section of a Rule in a CloudWatch
-    scheduled event.
+    The number of days may come from a "days" property of the CloudWatch event,
+    and will default to DEFAULT_DAYS_TO_KEEP.  You can specify the "days"
+    property by configuring the CloudWatch Rule, in its "inputs" section,
+    by specifying a constant JSON value.  Example:
+    {"account": "12345", "days": 28}
+
+    Note that "days" should be an integer.
     """
     account = event['account']
     days_to_keep = event.get('days', DEFAULT_DAYS_TO_KEEP)
