@@ -8,7 +8,7 @@ See http://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-depl
 To create `.zip` file for uploading:
 ```
 $ cd lambda-snapshots
-$ zip -r lambda-snapshots.zip .
+$ zip -r lamdbda-snapshots.zip . -x .git\*
 ```
 Then upload that zipfile when you create your Lambda function.
 
