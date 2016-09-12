@@ -31,10 +31,13 @@ def make_snapshots(event, context):
     vols = client.describe_volumes()['Volumes']
     vols_to_do = (v for v in vols if has_backup_tag(v))
     for v in vols_to_do:
-        client.create_snapshot(
+        s = client.create_snapshot(
             VolumeId=v['VolumeId'],
-            Description=volume_desc(v)
-        )
+            Description=volume_desc(v))
+        name = snapshot_name(v)
+        client.create_tags(
+            Resources=[s['SnapshotId']],
+            Tags=[{'Key': 'Name', 'Value': name}])
 
 def delete_old_snapshots(event, context):
     """Delete old snapshots older than DAYS_TO_KEEP days
@@ -75,3 +78,11 @@ def name_tag(tags):
             if t['Key'] == 'Name':
                 return t['Value']
     return ''
+
+def snapshot_name(volume):
+    name = name_tag(volume.get('Tags', []))
+    datestr = datetime.now(UTC()).strftime("%Y%m%d%H%M%S")
+    if name:
+        return "%s %s" % (name, datestr)
+    else:
+        return "%s %s" % (volume['VolumeId'], datestr)
