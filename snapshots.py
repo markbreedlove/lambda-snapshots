@@ -1,9 +1,13 @@
 """AWS Lambda functions for EBS Volume Snapshots"""
 
 import boto3
+import logging
 from datetime import tzinfo, timedelta, datetime
 
-DAYS_TO_KEEP = 30
+DEFAULT_DAYS_TO_KEEP = 30
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 class UTC(tzinfo):
     """
@@ -27,6 +31,7 @@ class UTC(tzinfo):
 
 def make_snapshots(event, context):
     """Make EBS snapshots from all volumes tagged with "Backup" == "true" """
+    logger.info("Making snapshots")
     client = boto3.client('ec2')
     vols = client.describe_volumes()['Volumes']
     vols_to_do = (v for v in vols if has_backup_tag(v))
@@ -47,11 +52,14 @@ def delete_old_snapshots(event, context):
     scheduled event.
     """
     account = event['account']
+    days_to_keep = event.get('days', DEFAULT_DAYS_TO_KEEP)
+    logger.info("Deleting snapshots older than %i days" % days_to_keep)
     client = boto3.client('ec2')
     snaps = client.describe_snapshots(OwnerIds=[account])['Snapshots']
-    old_snaps = (s for s in snaps if older_than(s['StartTime'], DAYS_TO_KEEP))
+    old_snaps = (s for s in snaps if older_than(s['StartTime'], days_to_keep))
     for s in old_snaps:
         client.delete_snapshot(SnapshotId=s['SnapshotId'])
+    logger.info("Done")
 
 def older_than(startdate, days):
     nowdate = datetime.now(UTC())
