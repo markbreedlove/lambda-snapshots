@@ -18,3 +18,26 @@ for the `Handler` property.  For example, I have a Lambda function named
 `make_snapshots` and its Handler is `snapshots.make_snapshots` because
 `snapshots.py` is the `snapshots` module and `make_snapshots` is the function
 that I want.
+
+For the `logging` calls to work, you will need an IAM policy that grants
+CloudWatch write privileges to be assigned to the role under which the Lambda
+job runs.  Here is an example:
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "your-unique-ID-here",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": [
+                "arn:aws:logs:*:*:*"
+            ]
+        }
+    ]
+}
+```
