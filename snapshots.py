@@ -34,7 +34,7 @@ def make_snapshots(event, context):
     logger.info("Making snapshots")
     client = boto3.client('ec2')
     vols = client.describe_volumes()['Volumes']
-    vols_to_do = (v for v in vols if has_backup_tag(v))
+    vols_to_do = (v for v in vols if has_true_tag('Backup', v))
     for v in vols_to_do:
         s = client.create_snapshot(
             VolumeId=v['VolumeId'],
@@ -42,7 +42,8 @@ def make_snapshots(event, context):
         name = snapshot_name(v)
         client.create_tags(
             Resources=[s['SnapshotId']],
-            Tags=[{'Key': 'Name', 'Value': name}])
+            Tags=[{'Key': 'Name', 'Value': name},
+                  {'Key': 'DeleteOK', 'Value': 'true'}])
 
 def delete_old_snapshots(event, context):
     """Delete old snapshots older than the specified number of days
@@ -60,7 +61,9 @@ def delete_old_snapshots(event, context):
     logger.info("Deleting snapshots older than %i days" % days_to_keep)
     client = boto3.client('ec2')
     snaps = client.describe_snapshots(OwnerIds=[account])['Snapshots']
-    old_snaps = (s for s in snaps if older_than(s['StartTime'], days_to_keep))
+    old_snaps = (s for s in snaps
+                 if older_than(s['StartTime'], days_to_keep)
+                 and has_true_tag('DeleteOK', s))
     for s in old_snaps:
         client.delete_snapshot(SnapshotId=s['SnapshotId'])
     logger.info("Done")
@@ -69,30 +72,36 @@ def older_than(startdate, days):
     nowdate = datetime.now(UTC())
     return (nowdate - startdate).days > days
 
-def has_backup_tag(volume):
-    tags = volume.get('Tags', [])
+def has_true_tag(key, record):
+    """Given a record, return whether it has a tag that is 'true'
+
+    The record can be a volume or a snapshot.
+    """
+    tags = record.get('Tags', [])
     for t in tags:
-        if t['Key'] == 'Backup' and t['Value'] == 'true':
+        if t['Key'] == key and t['Value'] == 'true':
             return True
     return False
 
 def volume_desc(volume):
+    """Return a string for the description of the given volume"""
     tags = volume.get('Tags', [])
-    name = name_tag(tags)
+    name = tag('Name', tags)
     if name:
         return "Backup of %s" % name
     else:
         return "Backup of %s" % volume['VolumeId']
 
-def name_tag(tags):
+def tag(key, tags):
+    """Return the value of the tag with the given key from the given list"""
     if tags:
         for t in tags:
-            if t['Key'] == 'Name':
+            if t['Key'] == key:
                 return t['Value']
     return ''
 
 def snapshot_name(volume):
-    name = name_tag(volume.get('Tags', []))
+    name = tag('Name', volume.get('Tags', []))
     datestr = datetime.now(UTC()).strftime("%Y%m%d%H%M%S")
     if name:
         return "%s %s" % (name, datestr)
